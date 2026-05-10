@@ -1,27 +1,23 @@
-# Core GPU Datasets
+# Data Engineering & Distillation Pipeline
 
-This folder contains the results of our large-scale data engineering pipeline. These datasets provide the foundational "knowledge" required for the CUDA2HIP LoRA adapter.
+This directory contains the logic for high-volume data acquisition, cleaning, and automated labeling for the CUDA-to-HIP transition.
 
-## Dataset: `cuda-hip-gpu-dataset`
+## Overview
+The goal of this module is to transform raw, heterogeneous CUDA source code into a structured dataset compatible with Fine-Tuning. We focus on "Distillation," using a larger model (Qwen2.5-Coder-7B) to act as a teacher for architectural analysis and reasoning.
 
-This is our primary supervised fine-tuning (SFT) source. It contains real-world code snippets translated and explained by experts (LLM-Distilled).
+## Pipeline Stages
+1. **Massive Sourcing:** Automated cloning of 20+ industry-leading NVIDIA repositories (`CUTLASS`, `cuFFT`, `Megatron-LM`, etc.).
+2. **Regex Extraction:** Deep parsing of `.cu` files to isolate functional `__global__` and `__device__` kernels.
+3. **Automated Conversion:** Direct syntax mapping using the `HIPIFY-perl` toolchain.
+4. **CoT & RAFT Labeling:** 
+   - **CoT (Chain-of-Thought):** Generates step-by-step migration notes.
+   - **RAFT (Reasoning-Aware):** Injects documentation context to train the model on retrieval-augmented generation patterns.
 
-### Key Features
-* **Samples:** 1,133 verified kernel pairs.
-* **Source Diversity:** Includes kernels from `cuFFT`, `cuPQC`, `MathDx`, and `nvCOMP`.
-* **Reasoning Depth:** Every sample includes a `Migration Notes` section explaining API shifts like `cudaMalloc` to `hipMalloc` and kernel launch macro differences.
+## Dataset Outputs
+- `cuda_to_hip_dataset.jsonl`: Raw translation pairs.
+- `cuda_hip_raft_dataset.jsonl`: Reasoning-aware samples with documentation context.
+- `cuda_arch_dataset.jsonl`: Deep architectural profiles of high-performance kernels.
 
-### Data Fields
-- `instruction`: The task description.
-- `input`: Original NVIDIA CUDA code.
-- `output`: HIP code + CoT (Chain of Thought) reasoning.
-- `source`: Origin repository for traceability.
-
-## Processing Pipeline
-1. **Scraping:** Automated cloning of NVIDIA/HPC repositories.
-2. **Cleaning:** Removing host-only code and non-functional boilerplate.
-3. **HIPIFY:** Generating the raw HIP translation.
-4. **CoT Labeling:** Generating reasoning traces using Qwen2.5-Coder on 2xT4 GPUs.
-
-## Usage
-This dataset is designed to be used with the `SFTTrainer` from the `trl` library to teach LLMs the structural and semantic rules of ROCm portability.
+## Hardware for Generation
+- **Environment:** 2x NVIDIA T4 GPUs.
+- **Optimization:** Utilizes `device_map="auto"` and batch inference to process >1,000 kernels in under 2 hours.
